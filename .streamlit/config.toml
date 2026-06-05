@@ -1,0 +1,15 @@
+# Tema VistoPred — versionado para garantir a identidade no Streamlit Cloud.
+[theme]
+base = "light"
+primaryColor = "#0891b2"            # ciano/teal (acento)
+backgroundColor = "#f1f5f9"         # cinza claro
+secondaryBackgroundColor = "#ffffff"
+textColor = "#0f2c50"               # azul escuro
+font = "sans serif"
+
+[client]
+showErrorDetails = true
+toolbarMode = "minimal"
+
+[server]
+enableXsrfProtection = true

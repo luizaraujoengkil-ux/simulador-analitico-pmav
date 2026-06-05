@@ -1,0 +1,8 @@
+# Dependências do Simulador Analítico PMAV – VistoPred
+# (lido automaticamente pelo Streamlit Community Cloud — manter na raiz)
+streamlit>=1.36,<2.0
+pandas>=2.0,<3.0
+numpy>=1.26,<3.0
+plotly>=5.22,<6.0
+statsmodels>=0.14,<0.15
+pydantic>=2.6,<3.0
