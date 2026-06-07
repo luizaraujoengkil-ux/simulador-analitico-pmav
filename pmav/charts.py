@@ -104,6 +104,29 @@ def chart_coefficients(model) -> go.Figure:
     return fig
 
 
+def chart_fit_scatter(df) -> go.Figure:
+    """Dispersão custo ajustado (x) × custo previsto (y) com a linha de 45° (y=x)."""
+    fig = go.Figure()
+    if not df.empty:
+        x = df["custo_ajustado"]
+        y = df["custo_previsto"]
+        lo = float(min(x.min(), y.min()))
+        hi = float(max(x.max(), y.max()))
+        fig.add_trace(go.Scatter(
+            x=x, y=y, mode="markers", name="Registros",
+            marker=dict(size=6, color=COLORS["brand_700"], opacity=0.45),
+            hovertemplate="Ajustado: R$ %{x:,.0f}<br>Previsto: R$ %{y:,.0f}<extra></extra>",
+        ))
+        fig.add_trace(go.Scatter(
+            x=[lo, hi], y=[lo, hi], mode="lines", name="Linha de 45° (previsão perfeita)",
+            line=dict(color="#dc2626", dash="dash", width=2), hoverinfo="skip",
+        ))
+    fig = _style(fig, height=360, legend=True)
+    fig.update_xaxes(title="Custo ajustado (R$)")
+    fig.update_yaxes(title="Custo previsto (R$)")
+    return fig
+
+
 def chart_cost_and_criticality(df_cc) -> go.Figure:
     """Eixo duplo: custo previsto (barras) + criticidade média projetada (linha)."""
     fig = go.Figure()

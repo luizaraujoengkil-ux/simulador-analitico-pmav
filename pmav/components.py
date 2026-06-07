@@ -81,7 +81,7 @@ def render_model_panel(model: ModelFit) -> None:
     c = model.coefficients
     engine = {"statsmodels": "statsmodels OLS", "numpy": "numpy OLS", "mock": "coeficientes mockados"}.get(model.engine, model.engine)
     if model.source == "mock":
-        meaning = "⚪ Modo Mockado — pesos fixos (referência); não se ajustam aos dados."
+        meaning = "⚪ Modo Mockado / Especialista — pesos definidos por você; não se ajustam aos dados."
     else:
         meaning = "🔵 Modo Ajustado (OLS) — pesos estimados dos dados; recalculam quando a base muda."
     betas = [

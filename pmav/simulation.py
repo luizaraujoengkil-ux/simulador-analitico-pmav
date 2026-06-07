@@ -76,11 +76,12 @@ def _alert_details(df: pd.DataFrame) -> tuple[list[str], list[str], list[str]]:
     return motivos, impactos, acoes
 
 
-def run_simulation(df_base: pd.DataFrame, scenario: Scenario, source: str = "ols") -> SimulationResult:
+def run_simulation(df_base: pd.DataFrame, scenario: Scenario, source: str = "ols",
+                   coefficients: dict | None = None) -> SimulationResult:
     """Executa a simulação completa para um cenário."""
     df = apply_scenario(df_base, scenario)
 
-    model = fit_or_mock(df, source)
+    model = fit_or_mock(df, source, coefficients)
     df["custo_previsto"] = predict_cost(model.coefficients, df).round(2)
     df["residuo"] = (df["custo_ajustado"] - df["custo_previsto"]).round(2)
     df["cenario"] = scenario.id
@@ -94,12 +95,14 @@ def run_simulation(df_base: pd.DataFrame, scenario: Scenario, source: str = "ols
     return SimulationResult(cenario=scenario.id, df=df, model=model)
 
 
-def run_all_scenarios(df_base: pd.DataFrame, scenarios: list[Scenario], source: str = "ols") -> list[SimulationResult]:
+def run_all_scenarios(df_base: pd.DataFrame, scenarios: list[Scenario], source: str = "ols",
+                      coefficients: dict | None = None) -> list[SimulationResult]:
     """Executa a simulação para todos os cenários (comparação entre cenários)."""
-    return [run_simulation(df_base, s, source) for s in scenarios]
+    return [run_simulation(df_base, s, source, coefficients) for s in scenarios]
 
 
-def simulate_concat(df_base: pd.DataFrame, scenarios: list[Scenario], source: str = "ols"):
+def simulate_concat(df_base: pd.DataFrame, scenarios: list[Scenario], source: str = "ols",
+                    coefficients: dict | None = None):
     """
     Roda todos os cenários e devolve:
       - um único DataFrame com TODOS os registros enriquecidos (coluna `cenario`)
@@ -109,7 +112,7 @@ def simulate_concat(df_base: pd.DataFrame, scenarios: list[Scenario], source: st
     frames: list[pd.DataFrame] = []
     models: dict[str, ModelFit] = {}
     for s in scenarios:
-        res = run_simulation(df_base, s, source)
+        res = run_simulation(df_base, s, source, coefficients)
         frames.append(res.df)
         models[s.id] = res.model
     full = pd.concat(frames, ignore_index=True)

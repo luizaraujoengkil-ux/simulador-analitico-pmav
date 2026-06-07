@@ -31,6 +31,7 @@ from pmav.catalog import (
     criticality_label,
 )
 from pmav.mock_data import COLUMNS
+from pmav.regression import DEFAULT_COEFFICIENTS
 from pmav.scenarios import SCENARIOS, SCENARIO_IDS, get_scenario
 from pmav.simulation import simulate_concat
 from pmav.theme import inject_css
@@ -61,11 +62,30 @@ def clear_filters():
     for k in FILTER_KEYS:
         st.session_state.pop(k, None)
 
+
+# Coeficientes editáveis do especialista (modo Mockados): (chave_sessão, rótulo, chave_do_coef).
+MOCK_FIELDS = [
+    ("mc_intercept", "β₀ · Intercepto (R$)", "intercept"),
+    ("mc_periodicidade", "β₁ · Periodicidade (R$/mês)", "periodicidade_meses"),
+    ("mc_criticidade", "β₂ · Criticidade (R$/nível)", "criticidade"),
+    ("mc_frequencia", "β₃ · Frequência (R$/interv./ano)", "frequencia_prevista"),
+    ("mc_horizonte", "β₄ · Horizonte (R$/ano)", "horizonte_ano"),
+]
+
+
+def restore_mock_defaults():
+    """Callback: restaura os coeficientes do especialista aos valores padrão."""
+    for key, _lbl, ckey in MOCK_FIELDS:
+        st.session_state[key] = float(DEFAULT_COEFFICIENTS[ckey])
+
+
 # Estado da sessão.
 if "working_tasks" not in st.session_state:
     st.session_state.working_tasks = ds.example_tasks()   # começa com a base de exemplo
 if "editor_version" not in st.session_state:
     st.session_state.editor_version = 0                    # versiona o editor p/ recarregar
+for _key, _lbl, _ck in MOCK_FIELDS:                        # inicializa os pesos do especialista
+    st.session_state.setdefault(_key, float(DEFAULT_COEFFICIENTS[_ck]))
 
 # Configuração de conexão VistoPred (opcional, via secrets).
 try:
@@ -76,9 +96,16 @@ except Exception:
 
 # ─────────────────────────────── Funções cacheadas ───────────────────────────────
 @st.cache_data(show_spinner=False)
-def run_simulation_cached(source: str, base: pd.DataFrame):
-    """Roda todos os cenários sobre a base. Cache por (source + conteúdo da base)."""
-    return simulate_concat(base, SCENARIOS, source)
+def run_simulation_cached(source: str, base: pd.DataFrame, mock_coefs):
+    """Roda todos os cenários. Cache por (source + base + coeficientes do especialista)."""
+    coefs = None
+    if source == "mock" and mock_coefs is not None:
+        coefs = {
+            "intercept": mock_coefs[0], "periodicidade_meses": mock_coefs[1],
+            "criticidade": mock_coefs[2], "frequencia_prevista": mock_coefs[3],
+            "horizonte_ano": mock_coefs[4],
+        }
+    return simulate_concat(base, SCENARIOS, source, coefficients=coefs)
 
 
 def asset_type_options() -> list[str]:
@@ -141,17 +168,22 @@ with st.sidebar:
 
     with st.expander("⚙️ Modelo estatístico"):
         source_label = st.radio(
-            "Coeficientes da regressão", ["Ajustados (OLS)", "Mockados"],
+            "Coeficientes da regressão", ["Ajustados (OLS)", "Mockados / Especialista"],
             help="Os dois usam a mesma fórmula; muda só de onde vêm os pesos (β). "
-                 "OLS: calculados dos seus dados. Mockados: fixos no código.",
+                 "OLS: calculados dos seus dados. Mockados/Especialista: você define os pesos.",
         )
         source = "ols" if source_label.startswith("Ajustados") else "mock"
         if source == "ols":
             st.caption("🔵 **Ajustados (OLS):** pesos **calculados dos seus dados**; recalculam ao "
                        "editar/importar/baixar. Entrega R² e RMSE. **Recomendado para análise real.**")
+            mock_coefs = None
         else:
-            st.caption("⚪ **Mockados:** pesos **fixos** (referência), não mudam com os dados. "
-                       "Para demonstração, base pequena ou impor valores de especialista.")
+            st.caption("⚪ **Mockados / Especialista:** **você define os pesos** abaixo (em R$). "
+                       "Impõe a visão técnica de um especialista para comparar com o OLS.")
+            for _k, _lbl, _ck in MOCK_FIELDS:
+                st.number_input(_lbl, step=10.0, format="%.2f", key=_k)
+            st.button("↩ Restaurar padrão", on_click=restore_mock_defaults, width="stretch")
+            mock_coefs = tuple(float(st.session_state[k]) for k, _l, _c in MOCK_FIELDS)
 
 
 # ─────────────────────────────────────── Cabeçalho ───────────────────────────────
@@ -351,7 +383,7 @@ base = ds.expand_tasks(clean_tasks)
 has_data = not base.empty
 
 if has_data:
-    full, models = run_simulation_cached(source, base)
+    full, models = run_simulation_cached(source, base, mock_coefs)
     df_scn = full[full["cenario"] == scenario_id]
 else:
     full = pd.DataFrame(columns=COLUMNS)
@@ -440,6 +472,12 @@ else:
     st.caption("Azul = o fator **aumenta** o custo previsto · vermelho = **reduz**. "
                "A **frequência** é o fator dominante e a **criticidade** é o único de efeito inverso. "
                "O β₀ (intercepto) é apenas a âncora da reta — por isso não entra como fator no gráfico.")
+
+    ui.section_title("Qualidade do ajuste — custo ajustado × previsto (linha de 45°)")
+    st.plotly_chart(charts.chart_fit_scatter(df_f), width="stretch")
+    st.caption("Cada ponto é um registro. Quanto **mais perto da linha vermelha (45°)**, melhor a previsão; "
+               "pontos espalhados = maior erro. É o **R² em forma visual**.")
+
     with st.expander("ℹ️ Sobre o modelo — qual opção de coeficientes usar?"):
         st.markdown(
             "**Os dois modos usam a mesma fórmula** — muda só *de onde vêm os pesos (β)*.\n\n"

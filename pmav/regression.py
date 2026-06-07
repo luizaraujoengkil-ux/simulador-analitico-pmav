@@ -105,13 +105,15 @@ def fit_regression(df: pd.DataFrame) -> ModelFit:
         return ModelFit(coef, r2, rmse, n, "ols", "numpy")
 
 
-def mock_fit(df: pd.DataFrame) -> ModelFit:
-    """Ajuste com coeficientes mockados fixos (modo configurável)."""
+def mock_fit(df: pd.DataFrame, coefficients: dict[str, float] | None = None) -> ModelFit:
+    """Ajuste com coeficientes mockados (padrão) ou definidos pelo especialista."""
+    coef = {**DEFAULT_COEFFICIENTS, **(coefficients or {})}
     n = len(df)
-    r2, rmse = _metrics(DEFAULT_COEFFICIENTS, df) if n else (0.0, 0.0)
-    return ModelFit(DEFAULT_COEFFICIENTS, r2, rmse, n, "mock", "mock")
+    r2, rmse = _metrics(coef, df) if n else (0.0, 0.0)
+    return ModelFit(coef, r2, rmse, n, "mock", "mock")
 
 
-def fit_or_mock(df: pd.DataFrame, source: str = "ols") -> ModelFit:
-    """Despacha entre o ajuste OLS e os coeficientes mockados."""
-    return mock_fit(df) if source == "mock" else fit_regression(df)
+def fit_or_mock(df: pd.DataFrame, source: str = "ols",
+                coefficients: dict[str, float] | None = None) -> ModelFit:
+    """Despacha entre o ajuste OLS e os coeficientes mockados/especialista."""
+    return mock_fit(df, coefficients) if source == "mock" else fit_regression(df)
