@@ -168,7 +168,7 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
     # ---- Controles específicos do modo selecionado ----
     if mode == MODE_MODEL:
         c = st.columns([1, 2])
-        if c[0].button("🔄 Carregar / restaurar base de exemplo", use_container_width=True):
+        if c[0].button("🔄 Carregar / restaurar base de exemplo", width="stretch"):
             st.session_state.working_tasks = ds.example_tasks()
             st.session_state.editor_version += 1
             st.rerun()
@@ -201,7 +201,7 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
                                "Ajuste sistema, subsistema e custo na tabela abaixo.")
                     st.rerun()
         cc = st.columns([1, 2])
-        if cc[0].button("🧹 Começar base vazia", use_container_width=True):
+        if cc[0].button("🧹 Começar base vazia", width="stretch"):
             st.session_state.working_tasks = ds.empty_tasks()
             st.session_state.editor_version += 1
             st.rerun()
@@ -240,7 +240,7 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
     ui.section_title("Base de Tarefas — corrigir · incluir · excluir")
     edited = st.data_editor(
         st.session_state.working_tasks,
-        num_rows="dynamic", use_container_width=True, height=320,
+        num_rows="dynamic", width="stretch", height=320,
         key=f"editor_{st.session_state.editor_version}",
         column_config=editor_column_config(asset_type_options(), system_options()),
     )
@@ -322,7 +322,7 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
                     st.warning(w)
                 if not clean.empty:
                     st.success(f"{len(clean)} Tarefa(s) válida(s) prontas para importar.")
-                    st.dataframe(clean, use_container_width=True, hide_index=True, height=180)
+                    st.dataframe(clean, width="stretch", hide_index=True, height=180)
                     if st.button("➕ Adicionar Tarefas importadas à base", type="primary"):
                         st.session_state.working_tasks = pd.concat(
                             [st.session_state.working_tasks, clean], ignore_index=True)
@@ -337,12 +337,12 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
         x1.download_button(
             "Exportar Tarefas (CSV)",
             data=st.session_state.working_tasks.to_csv(index=False).encode("utf-8-sig"),
-            file_name="tarefas_pmav.csv", mime="text/csv", use_container_width=True)
+            file_name="tarefas_pmav.csv", mime="text/csv", width="stretch")
         x2.download_button(
             "Exportar base completa (10 anos)",
             data=ds.expand_tasks(_clean_now).to_csv(index=False).encode("utf-8-sig"),
             file_name="base_pmav_completa.csv", mime="text/csv",
-            disabled=_clean_now.empty, use_container_width=True)
+            disabled=_clean_now.empty, width="stretch")
 
 
 # ─────────────────────── Montagem da base + simulação ────────────────────────────
@@ -389,7 +389,7 @@ with st.sidebar:
 
     f_crit = st.multiselect("Criticidade", CRITICALITY_LEVELS, format_func=criticality_label, key="f_crit")
     f_horizonte = st.slider("Horizonte (ano do PMAV)", 1, 10, (1, 10), key="f_horizonte")
-    st.button("🧹 Limpar filtros", use_container_width=True, on_click=clear_filters)
+    st.button("🧹 Limpar filtros", width="stretch", on_click=clear_filters)
 
 
 def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
@@ -436,7 +436,7 @@ else:
     st.write("")
     ui.render_model_panel(model)
     ui.section_title("Coeficientes do modelo (β) — efeito de cada fator")
-    st.plotly_chart(charts.chart_coefficients(model), use_container_width=True)
+    st.plotly_chart(charts.chart_coefficients(model), width="stretch")
     st.caption("Azul = o fator **aumenta** o custo previsto · vermelho = **reduz**. "
                "A **frequência** é o fator dominante e a **criticidade** é o único de efeito inverso. "
                "O β₀ (intercepto) é apenas a âncora da reta — por isso não entra como fator no gráfico.")
@@ -459,28 +459,28 @@ else:
     with col1:
         ui.section_title("Custo total previsto por cenário")
         st.plotly_chart(charts.chart_cost_by_scenario(agg.cost_by_scenario(df_all_f), scenario_id),
-                        use_container_width=True)
+                        width="stretch")
     with col2:
         ui.section_title("Custo previsto por sistema")
-        st.plotly_chart(charts.chart_cost_by_system(agg.cost_by_system(df_f)), use_container_width=True)
+        st.plotly_chart(charts.chart_cost_by_system(agg.cost_by_system(df_f)), width="stretch")
 
     col3, col4 = st.columns(2)
     with col3:
         ui.section_title("Custo ajustado vs. custo previsto")
-        st.plotly_chart(charts.chart_adjusted_vs_predicted(agg.adjusted_vs_predicted(df_f)), use_container_width=True)
+        st.plotly_chart(charts.chart_adjusted_vs_predicted(agg.adjusted_vs_predicted(df_f)), width="stretch")
     with col4:
         ui.section_title("Distribuição de alertas por sistema")
-        st.plotly_chart(charts.chart_alerts_by_system(agg.alerts_by_system(df_f)), use_container_width=True)
+        st.plotly_chart(charts.chart_alerts_by_system(agg.alerts_by_system(df_f)), width="stretch")
 
     ui.section_title("Custo previsto e criticidade média projetada por sistema")
-    st.plotly_chart(charts.chart_cost_and_criticality(agg.cost_and_criticality_by_system(df_f)), use_container_width=True)
+    st.plotly_chart(charts.chart_cost_and_criticality(agg.cost_and_criticality_by_system(df_f)), width="stretch")
     st.write("")
 
     left, right = st.columns([1.15, 1])
     with left:
         ui.section_title("Ranking de sistemas prioritários")
         st.dataframe(
-            agg.system_ranking(df_f), use_container_width=True, hide_index=True,
+            agg.system_ranking(df_f), width="stretch", hide_index=True,
             column_config={
                 "sistema": "Sistema",
                 "custo_previsto": st.column_config.NumberColumn("Custo previsto (R$)", format="%.0f"),
@@ -501,7 +501,7 @@ else:
         "custo_base", "custo_ajustado", "custo_previsto", "prioridade", "status_alerta",
     ]
     st.dataframe(
-        df_f[table_cols], use_container_width=True, hide_index=True, height=360,
+        df_f[table_cols], width="stretch", hide_index=True, height=360,
         column_config={
             "nome_ativo": "Ativo", "tipo_ativo": "Tipo", "sistema": "Sistema", "subsistema": "Subsistema",
             "tipo_os": "Tipo O.S.",
