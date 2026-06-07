@@ -45,9 +45,18 @@ st.set_page_config(
 inject_css()
 
 # Modos de fonte de dados.
-MODE_MODEL = "Edificação Modelo"
+MODE_MODEL = "Dados Modelo"
 MODE_NEW = "Novo Ativo"
 MODE_VP = "Baixar do App VistoPred"
+
+# Chaves dos filtros (usadas para resetar no botão "Limpar filtros").
+FILTER_KEYS = ["f_ativos", "f_tipos", "f_sistemas", "f_subs", "f_crit", "f_horizonte"]
+
+
+def clear_filters():
+    """Callback do botão Limpar filtros: remove os estados dos filtros."""
+    for k in FILTER_KEYS:
+        st.session_state.pop(k, None)
 
 # Estado da sessão.
 if "working_tasks" not in st.session_state:
@@ -103,7 +112,7 @@ with st.sidebar:
     mode = st.radio(
         "Selecione a origem dos dados", [MODE_MODEL, MODE_NEW, MODE_VP],
         label_visibility="collapsed",
-        captions=["Base fictícia de exemplo", "Cadastrar do zero / planilha", "Baixar por código da edificação"],
+        captions=["Vários ativos fictícios de exemplo", "Cadastrar do zero / planilha", "Baixar por código da edificação"],
     )
     st.caption("⬇️ Os controles desta opção abrem no painel **Dados & Tarefas** (topo da página).")
 
@@ -298,17 +307,37 @@ else:
 
 
 # ─────────────────────────────── Sidebar (filtros) ───────────────────────────────
+def _prune(key: str, options: list) -> None:
+    """Remove do estado do filtro valores que não existem mais nas opções."""
+    if key in st.session_state:
+        st.session_state[key] = [v for v in st.session_state[key] if v in options]
+
+
 with st.sidebar:
     st.divider()
     st.markdown("**Filtros**")
+    st.caption("＊ Campo de filtro vazio = mostra **tudo**. Os filtros se combinam (lógica E).")
+
     nomes_opt = sorted(base["nome_ativo"].unique()) if has_data else []
-    f_ativos = st.multiselect("Ativo (nome)", nomes_opt)
-    f_tipos = st.multiselect("Tipo de ativo", sorted(base["tipo_ativo"].unique()) if has_data else [])
-    f_sistemas = st.multiselect("Sistema", sorted(base["sistema"].unique()) if has_data else [])
+    _prune("f_ativos", nomes_opt)
+    f_ativos = st.multiselect("Ativo (nome)", nomes_opt, key="f_ativos")
+
+    tipos_opt = sorted(base["tipo_ativo"].unique()) if has_data else []
+    _prune("f_tipos", tipos_opt)
+    f_tipos = st.multiselect("Tipo de ativo", tipos_opt, key="f_tipos")
+
+    sistemas_opt = sorted(base["sistema"].unique()) if has_data else []
+    _prune("f_sistemas", sistemas_opt)
+    f_sistemas = st.multiselect("Sistema", sistemas_opt, key="f_sistemas")
+
     _sub_pool = base[base["sistema"].isin(f_sistemas)] if (f_sistemas and has_data) else base
-    f_subs = st.multiselect("Subsistema", sorted(_sub_pool["subsistema"].unique()) if has_data else [])
-    f_crit = st.multiselect("Criticidade", CRITICALITY_LEVELS, format_func=criticality_label)
-    f_horizonte = st.slider("Horizonte (ano do PMAV)", 1, 10, (1, 10))
+    subs_opt = sorted(_sub_pool["subsistema"].unique()) if has_data else []
+    _prune("f_subs", subs_opt)
+    f_subs = st.multiselect("Subsistema", subs_opt, key="f_subs")
+
+    f_crit = st.multiselect("Criticidade", CRITICALITY_LEVELS, format_func=criticality_label, key="f_crit")
+    f_horizonte = st.slider("Horizonte (ano do PMAV)", 1, 10, (1, 10), key="f_horizonte")
+    st.button("🧹 Limpar filtros", use_container_width=True, on_click=clear_filters)
 
 
 def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
@@ -343,7 +372,7 @@ else:
 # ─────────────────────────────────────── Dashboard ───────────────────────────────
 if not has_data:
     st.info("Sem dados na base. No painel **Dados & Tarefas** (acima): cadastre um **Novo Ativo**, "
-            "**baixe do App VistoPred** pelo código, ou volte para a **Edificação Modelo** na barra lateral.")
+            "**baixe do App VistoPred** pelo código, ou volte para os **Dados Modelo** na barra lateral.")
 elif df_f.empty:
     st.warning("Nenhum registro corresponde aos filtros selecionados. Ajuste os filtros na barra lateral.")
 else:
