@@ -77,6 +77,10 @@ def render_model_panel(model: ModelFit) -> None:
     """Card transparente do modelo estatístico (coeficientes, R², RMSE)."""
     c = model.coefficients
     engine = {"statsmodels": "statsmodels OLS", "numpy": "numpy OLS", "mock": "coeficientes mockados"}.get(model.engine, model.engine)
+    if model.source == "mock":
+        meaning = "⚪ Modo Mockado — pesos fixos (referência); não se ajustam aos dados."
+    else:
+        meaning = "🔵 Modo Ajustado (OLS) — pesos estimados dos dados; recalculam quando a base muda."
     betas = [
         ("β₀ (intercepto)", c["intercept"]),
         ("β₁ (periodicidade)", c["periodicidade_meses"]),
@@ -94,9 +98,10 @@ def render_model_panel(model: ModelFit) -> None:
         f"""
         <div class="vp-card">
             <div class="vp-section">Modelo estatístico — regressão linear múltipla</div>
-            <div style="font-size:13px;color:{COLORS['slate_500']};margin-bottom:10px">
+            <div style="font-size:13px;color:{COLORS['slate_500']};margin-bottom:6px">
                 Custo = β₀ + β₁·Periodicidade + β₂·Criticidade + β₃·Frequência + β₄·Horizonte &nbsp;·&nbsp; motor: {html.escape(engine)}
             </div>
+            <div style="font-size:12.5px;color:{COLORS['brand_700']};font-weight:600;margin-bottom:10px">{html.escape(meaning)}</div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">{chips}</div>
             <div style="font-size:12px;color:{COLORS['slate_500']};margin-top:12px">
                 R² = <b>{format_percent(model.r2)}</b> &nbsp;·&nbsp; RMSE = <b>{format_brl(model.rmse)}</b>

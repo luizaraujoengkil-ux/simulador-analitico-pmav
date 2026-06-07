@@ -116,9 +116,16 @@ with st.sidebar:
     with st.expander("⚙️ Modelo estatístico"):
         source_label = st.radio(
             "Coeficientes da regressão", ["Ajustados (OLS)", "Mockados"],
-            help="OLS: estimados dos dados (statsmodels). Mockados: fixos (pmav/regression.py).",
+            help="Os dois usam a mesma fórmula; muda só de onde vêm os pesos (β). "
+                 "OLS: calculados dos seus dados. Mockados: fixos no código.",
         )
         source = "ols" if source_label.startswith("Ajustados") else "mock"
+        if source == "ols":
+            st.caption("🔵 **Ajustados (OLS):** pesos **calculados dos seus dados**; recalculam ao "
+                       "editar/importar/baixar. Entrega R² e RMSE. **Recomendado para análise real.**")
+        else:
+            st.caption("⚪ **Mockados:** pesos **fixos** (referência), não mudam com os dados. "
+                       "Para demonstração, base pequena ou impor valores de especialista.")
 
 
 # ─────────────────────────────────────── Cabeçalho ───────────────────────────────
@@ -345,6 +352,19 @@ else:
     ui.render_kpis(kpis)
     st.write("")
     ui.render_model_panel(model)
+    with st.expander("ℹ️ Sobre o modelo — qual opção de coeficientes usar?"):
+        st.markdown(
+            "**Os dois modos usam a mesma fórmula** — muda só *de onde vêm os pesos (β)*.\n\n"
+            "- 🔵 **Ajustados (OLS):** os β são **calculados a partir dos seus dados** (statsmodels). "
+            "Adaptam-se quando você edita, importa ou baixa dados; entregam **R²** e **RMSE**. "
+            "**Recomendado para análise real.**\n"
+            "- ⚪ **Mockados:** β **fixos** (em `pmav/regression.py`), não mudam com os dados. "
+            "Bons para **demonstração**, base pequena ou impor **pesos de especialista**.\n\n"
+            "**Analogia:** OLS = alfaiate (corta sob medida); Mockado = roupa de tamanho padrão.\n\n"
+            "**Dica:** no OLS, o *custo total previsto* tende a coincidir com o *custo total ajustado* "
+            "(modelo sem viés). Nos mockados eles divergem — é a régua fixa, não feita sob medida. "
+            "Em ambos, só muda o **custo previsto**; o **custo ajustado** (referência do cenário) é o mesmo."
+        )
     st.write("")
 
     col1, col2 = st.columns(2)
