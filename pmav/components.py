@@ -168,6 +168,31 @@ def section_title(text: str) -> None:
     st.markdown(f'<div class="vp-section">{html.escape(text)}</div>', unsafe_allow_html=True)
 
 
+def render_criticality_help() -> None:
+    """Legenda: escala de criticidade (0–5), regras de alerta e efeito do cenário."""
+    badges = "".join(
+        f'<span class="vp-badge" style="background:{info.color};margin:2px 6px 2px 0">'
+        f'{lvl} · {html.escape(info.label)}</span>'
+        for lvl, info in CRITICALITY_SCALE.items()
+    )
+    st.markdown(f'<div style="margin:2px 0 10px">{badges}</div>', unsafe_allow_html=True)
+    st.markdown(
+        "**Escala de criticidade** — vai de **0 (risco iminente)** a **5 (condição mais favorável)**. "
+        "Quanto **menor o número, pior** a condição do sistema/subsistema.\n\n"
+        "**Como os alertas são decididos** (para cada tarefa, em cada ano do horizonte):\n"
+        "- 🔴 **Imediato** — criticidade **= 0** hoje → exige ação **agora**.\n"
+        "- 🟠 **Preditivo** — criticidade > 0, mas a **projeção** indica queda a **≤ 1,0** ao longo dos anos "
+        "(deterioração) → antecipar a manutenção.\n"
+        "- ⚪ **Normal** — a projeção permanece **acima de 1,0**.\n\n"
+        "**Como isso muda na simulação** — a *criticidade projetada* cai ao longo dos 10 anos conforme o "
+        "**fator de degradação** do ativo e o **cenário** escolhido:\n"
+        "- Cenários severos (**Ambiente agressivo**, **Envelhecimento acelerado**, **Restrição orçamentária**) "
+        "**aceleram a deterioração** → mais alertas preditivos e custos maiores.\n"
+        "- **Otimista** reduz a deterioração; **Base** é a referência neutra.\n\n"
+        "Troque o **cenário** ou aplique **filtros** na barra lateral e todos os números acima recalculam na hora."
+    )
+
+
 def render_asset_bar(df: pd.DataFrame) -> None:
     """Barra de contexto do(s) ativo(s) no recorte atual (nome + dados em destaque)."""
     if df.empty:

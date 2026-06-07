@@ -431,6 +431,8 @@ else:
     ui.render_asset_bar(df_f)
     st.write("")
     ui.render_kpis(kpis)
+    with st.expander("ℹ️ Entenda a criticidade e os alertas (e como o cenário muda a simulação)"):
+        ui.render_criticality_help()
     st.write("")
     ui.render_model_panel(model)
     with st.expander("ℹ️ Sobre o modelo — qual opção de coeficientes usar?"):
