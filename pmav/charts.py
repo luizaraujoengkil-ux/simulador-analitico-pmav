@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import plotly.graph_objects as go
 
+from .formatting import format_number
 from .theme import CHART_COLORWAY, COLORS
 
 
@@ -80,6 +81,26 @@ def chart_alerts_by_system(df_alerts) -> go.Figure:
     fig.update_layout(barmode="stack")
     fig = _style(fig, legend=True)
     fig.update_xaxes(tickangle=-35)
+    return fig
+
+
+def chart_coefficients(model) -> go.Figure:
+    """Barras horizontais dos coeficientes β₁–β₄ (azul = aumenta custo, vermelho = reduz)."""
+    keys = ["periodicidade_meses", "criticidade", "frequencia_prevista", "horizonte_ano"]
+    labels = ["β₁ · Periodicidade", "β₂ · Criticidade", "β₃ · Frequência", "β₄ · Horizonte"]
+    vals = [float(model.coefficients[k]) for k in keys]
+    colors = ["#dc2626" if v < 0 else COLORS["ciano_600"] for v in vals]
+    fig = go.Figure(
+        go.Bar(
+            x=vals, y=labels, orientation="h", marker_color=colors,
+            text=[format_number(v, 0) for v in vals], textposition="outside", cliponaxis=False,
+            hovertemplate="%{y}<br>coeficiente: %{x:,.2f}<extra></extra>",
+        )
+    )
+    fig = _style(fig, height=260)
+    fig.add_vline(x=0, line_color=COLORS["slate_500"], line_width=1)
+    fig.update_yaxes(autorange="reversed")  # β₁ no topo
+    fig.update_xaxes(showgrid=True, gridcolor=COLORS["cinza_200"])
     return fig
 
 

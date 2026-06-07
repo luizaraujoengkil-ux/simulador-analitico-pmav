@@ -435,6 +435,11 @@ else:
         ui.render_criticality_help()
     st.write("")
     ui.render_model_panel(model)
+    ui.section_title("Coeficientes do modelo (β) — efeito de cada fator")
+    st.plotly_chart(charts.chart_coefficients(model), use_container_width=True)
+    st.caption("Azul = o fator **aumenta** o custo previsto · vermelho = **reduz**. "
+               "A **frequência** é o fator dominante e a **criticidade** é o único de efeito inverso. "
+               "O β₀ (intercepto) é apenas a âncora da reta — por isso não entra como fator no gráfico.")
     with st.expander("ℹ️ Sobre o modelo — qual opção de coeficientes usar?"):
         st.markdown(
             "**Os dois modos usam a mesma fórmula** — muda só *de onde vêm os pesos (β)*.\n\n"
