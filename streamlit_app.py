@@ -6,9 +6,10 @@ Fluxo:
   Fonte de dados (Modelo / Novo Ativo / VistoPred) → base editável de Tarefas
   → expansão no horizonte → simulação (cenários + OLS + alertas) → dashboard.
 
-Observação de ordem: a aba "Dados & Tarefas" é processada ANTES de montar a base
-(embora apareça depois no layout), para que edições na tabela atualizem o
-dashboard no mesmo ciclo.
+UX: o painel "Dados & Tarefas" fica no topo da área principal e ABRE
+automaticamente quando o usuário escolhe "Novo Ativo" ou "Baixar do VistoPred",
+expondo na hora o formulário / o campo de código. É processado antes de montar a
+base, para que edições reflitam no dashboard no mesmo ciclo.
 """
 from __future__ import annotations
 
@@ -68,44 +69,8 @@ def run_simulation_cached(source: str, base: pd.DataFrame):
     return simulate_concat(base, SCENARIOS, source)
 
 
-# ─────────────────────────── Sidebar (topo) — fonte/cenário ──────────────────────
-with st.sidebar:
-    st.markdown(
-        '<div class="vp-side-eyebrow">VistoPred</div>'
-        '<div class="vp-side-logo">Simulador PMAV</div>',
-        unsafe_allow_html=True,
-    )
-    st.caption(f"Módulo analítico · v{__version__}")
-
-    # >>> Seletor de FONTE DE DADOS (área destacada no topo) <<<
-    st.markdown("**Fonte de dados**")
-    mode = st.radio(
-        "Selecione a origem dos dados", [MODE_MODEL, MODE_NEW, MODE_VP],
-        label_visibility="collapsed",
-        captions=["Base fictícia de exemplo", "Cadastrar do zero / planilha", "Baixar por código da edificação"],
-    )
-
-    st.divider()
-    scenario_id = st.selectbox("Cenário analítico", SCENARIO_IDS,
-                               format_func=lambda sid: get_scenario(sid).nome)
-    scenario = get_scenario(scenario_id)
-    st.caption(scenario.descricao)
-
-    with st.expander("⚙️ Modelo estatístico"):
-        source_label = st.radio(
-            "Coeficientes da regressão", ["Ajustados (OLS)", "Mockados"],
-            help="OLS: estimados dos dados (statsmodels). Mockados: fixos (pmav/regression.py).",
-        )
-        source = "ols" if source_label.startswith("Ajustados") else "mock"
-
-
-# ─────────────────────────────────── Cabeçalho + abas ────────────────────────────
-ui.render_header(scenario)
-tab_dash, tab_data = st.tabs(["📊  Dashboard", "📥  Dados & Tarefas"])
-
-
 def editor_column_config() -> dict:
-    """Configuração das colunas da tabela editável (dropdowns + numéricos validados)."""
+    """Colunas da tabela editável (dropdowns + numéricos validados)."""
     return {
         "id_ativo": st.column_config.TextColumn("ID ativo"),
         "tipo_ativo": st.column_config.SelectboxColumn("Tipo", options=ASSET_TYPES, required=True),
@@ -125,37 +90,77 @@ def editor_column_config() -> dict:
     }
 
 
-# ============================ ABA 2 — DADOS & TAREFAS ===========================
-# (processada antes de montar a base; aparece como 2ª aba no layout)
-with tab_data:
-    ui.section_title(f"Fonte de dados — {mode}")
+# ─────────────────────────── Sidebar (topo) — fonte/cenário ──────────────────────
+with st.sidebar:
+    st.markdown(
+        '<div class="vp-side-eyebrow">VistoPred</div>'
+        '<div class="vp-side-logo">Simulador PMAV</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(f"Módulo analítico · v{__version__}")
 
+    st.markdown("**Fonte de dados**")
+    mode = st.radio(
+        "Selecione a origem dos dados", [MODE_MODEL, MODE_NEW, MODE_VP],
+        label_visibility="collapsed",
+        captions=["Base fictícia de exemplo", "Cadastrar do zero / planilha", "Baixar por código da edificação"],
+    )
+    st.caption("⬇️ Os controles desta opção abrem no painel **Dados & Tarefas** (topo da página).")
+
+    st.divider()
+    scenario_id = st.selectbox("Cenário analítico", SCENARIO_IDS,
+                               format_func=lambda sid: get_scenario(sid).nome)
+    scenario = get_scenario(scenario_id)
+    st.caption(scenario.descricao)
+
+    with st.expander("⚙️ Modelo estatístico"):
+        source_label = st.radio(
+            "Coeficientes da regressão", ["Ajustados (OLS)", "Mockados"],
+            help="OLS: estimados dos dados (statsmodels). Mockados: fixos (pmav/regression.py).",
+        )
+        source = "ols" if source_label.startswith("Ajustados") else "mock"
+
+
+# ─────────────────────────────────────── Cabeçalho ───────────────────────────────
+ui.render_header(scenario)
+
+
+# ============== PAINEL DE DADOS (topo) — abre sozinho por modo ==================
+# Abre automaticamente em "Novo Ativo"/"VistoPred" ou quando a base está vazia.
+_panel_open = (mode in (MODE_NEW, MODE_VP)) or st.session_state.working_tasks.empty
+
+with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar · baixar do VistoPred)",
+                 expanded=_panel_open):
+
+    # ---- Controles específicos do modo selecionado ----
     if mode == MODE_MODEL:
         c = st.columns([1, 2])
         if c[0].button("🔄 Carregar / restaurar base de exemplo", use_container_width=True):
             st.session_state.working_tasks = ds.example_tasks()
             st.session_state.editor_version += 1
             st.rerun()
-        c[1].caption("Base fictícia com 6 ativos (Edificação, Ponte, Viaduto, Túnel, Rodovia, Contenção). "
-                     "Edite as Tarefas na tabela abaixo.")
+        c[1].caption("Base fictícia com 6 ativos. Edite as Tarefas na tabela abaixo.")
 
     elif mode == MODE_NEW:
-        c = st.columns([1, 2])
-        if c[0].button("🆕 Iniciar base vazia (novo ativo)", use_container_width=True):
+        st.markdown("##### 🆕 Novo Ativo — cadastre abaixo")
+        cc = st.columns([1, 2])
+        if cc[0].button("🧹 Começar base vazia", use_container_width=True):
             st.session_state.working_tasks = ds.empty_tasks()
             st.session_state.editor_version += 1
             st.rerun()
-        c[1].caption("Comece do zero: cadastre o ativo (tipo, nome) e suas Tarefas/O.S. na tabela abaixo, "
-                     "ou importe uma planilha logo adiante.")
+        cc[1].caption("Preencha o **formulário guiado** abaixo (ou edite direto na tabela) "
+                      "para cadastrar o ativo e suas Tarefas/O.S.")
 
     else:  # MODE_VP
-        st.caption("Baixe os dados de uma edificação do App VistoPred informando o **código**.")
-        c = st.columns([1.4, 1, 1])
-        codigo = c[0].text_input("Código da edificação (VistoPred)", placeholder="ex.: 10482")
-        modo_dl = c[1].radio("Ao baixar", ["Substituir", "Adicionar"], horizontal=True)
-        c[2].caption("🔌 Conexão configurada" if vp.is_configured(vp_cfg)
-                     else "ℹ️ Demonstração (conexão real não configurada)")
-        if st.button("🔌 Conectar e baixar", type="primary"):
+        st.markdown("##### 🔌 Baixar do App VistoPred")
+        st.caption("Informe o **Código da Edificação** (ex.: um UUID como "
+                   "`d387aef0-9efb-11f0-9f5d-bb4ac9f1ee38`).")
+        vc = st.columns([2.2, 1, 1])
+        codigo = vc[0].text_input("Código da Edificação", placeholder="cole o código do VistoPred aqui")
+        modo_dl = vc[1].radio("Ao baixar", ["Substituir", "Adicionar"], horizontal=False)
+        vc[2].caption("🔌 Conexão configurada" if vp.is_configured(vp_cfg)
+                      else "ℹ️ Demonstração\n(sem conexão real)")
+        if st.button("🔌 Conectar e baixar dados", type="primary"):
             try:
                 tarefas_vp, msg = vp.fetch_tasks(codigo, vp_cfg)
                 if modo_dl == "Substituir":
@@ -164,7 +169,7 @@ with tab_data:
                     st.session_state.working_tasks = pd.concat(
                         [st.session_state.working_tasks, tarefas_vp], ignore_index=True)
                 st.session_state.editor_version += 1
-                st.success(f"{len(tarefas_vp)} Tarefa(s) baixada(s) para o código {codigo}.")
+                st.success(f"{len(tarefas_vp)} Tarefa(s) baixada(s) para o código informado.")
                 st.info(msg)
                 st.rerun()
             except NotImplementedError as exc:
@@ -174,61 +179,102 @@ with tab_data:
 
     st.divider()
 
-    # Tabela editável: editar · incluir · excluir
-    ui.section_title("Editar base — Tarefas (corrigir · incluir · excluir)")
+    # ---- Tabela editável: corrigir · incluir · excluir ----
+    ui.section_title("Base de Tarefas — corrigir · incluir · excluir")
     edited = st.data_editor(
         st.session_state.working_tasks,
-        num_rows="dynamic", use_container_width=True, height=380,
+        num_rows="dynamic", use_container_width=True, height=320,
         key=f"editor_{st.session_state.editor_version}",
         column_config=editor_column_config(),
     )
     st.session_state.working_tasks = edited
     _clean_now, _, _ = ds.validate_tasks(st.session_state.working_tasks)
-    st.caption(f"✅ {len(_clean_now)} Tarefa(s) válida(s) na base · ➕ adicione linhas no fim da tabela · "
-               "selecione e use 🗑️ para excluir. As mudanças atualizam a simulação automaticamente.")
+    st.caption(f"✅ {len(_clean_now)} Tarefa(s) válida(s) · ➕ adicione no fim da tabela · "
+               "selecione linhas e use 🗑️ para excluir. As mudanças atualizam a simulação.")
 
-    st.divider()
+    # ---- Formulário guiado (principal no modo Novo Ativo) ----
+    with st.expander("➕ Adicionar Tarefa (formulário guiado)", expanded=(mode == MODE_NEW)):
+        with st.form("nova_tarefa", clear_on_submit=True):
+            f1, f2, f3 = st.columns(3)
+            nome = f1.text_input("Nome do ativo *")
+            tipo = f2.selectbox("Tipo de ativo *", ASSET_TYPES)
+            id_ativo = f3.text_input("ID do ativo", help="Opcional — gerado do nome se vazio.")
 
-    # Importar planilha (CSV/Excel)
-    ui.section_title("Importar planilha (CSV / Excel)")
-    st.download_button("📄 Baixar template CSV", data=ds.task_template_csv(),
-                       file_name="template_tarefas_pmav.csv", mime="text/csv")
-    uploaded = st.file_uploader("Enviar arquivo de Tarefas (uma linha por Tarefa)", type=["csv", "xlsx", "xls"])
-    if uploaded is not None:
-        try:
-            raw = ds.read_uploaded(uploaded)
-            clean, errors, warnings = ds.validate_tasks(raw)
-            for e in errors:
-                st.error(e)
-            for w in warnings:
-                st.warning(w)
-            if not clean.empty:
-                st.success(f"{len(clean)} Tarefa(s) válida(s) prontas para importar.")
-                st.dataframe(clean, use_container_width=True, hide_index=True, height=200)
-                if st.button("➕ Adicionar Tarefas importadas à base", type="primary"):
+            f4, f5, f6 = st.columns(3)
+            sistema = f4.selectbox("Sistema *", SYSTEM_NAMES)
+            subsistema = f5.text_input("Subsistema *")
+            tipo_os = f6.selectbox("Tipo de O.S.", OS_TYPES)
+
+            f7, f8, f9 = st.columns(3)
+            periodicidade = f7.number_input("Periodicidade (meses) *", min_value=1, max_value=120, value=12, step=1)
+            criticidade = f8.selectbox("Criticidade *", CRITICALITY_LEVELS, format_func=criticality_label, index=2)
+            custo = f9.number_input("Custo base (R$) *", min_value=0.0, value=20000.0, step=500.0)
+
+            f10, f11, f12 = st.columns(3)
+            ambiente = f10.selectbox("Ambiente de exposição", EXPOSURE_ENVIRONMENTS, index=1)
+            idade = f11.number_input("Idade do ativo (anos)", min_value=0, max_value=120, value=10, step=1)
+            fator = f12.slider("Fator de degradação", 0.05, 0.95, 0.30, 0.01)
+
+            data_ref = st.date_input("Data de referência")
+            obs = st.text_input("Observação técnica (opcional)")
+            submitted = st.form_submit_button("➕ Adicionar Tarefa à base", type="primary")
+
+            if submitted:
+                if not nome.strip() or not subsistema.strip():
+                    st.error("Preencha pelo menos **Nome do ativo** e **Subsistema**.")
+                else:
+                    nova = {
+                        "id_ativo": id_ativo.strip() or ds.slugify_id(nome),
+                        "tipo_ativo": tipo, "nome_ativo": nome.strip(),
+                        "sistema": sistema, "subsistema": subsistema.strip(), "tipo_os": tipo_os,
+                        "periodicidade_meses": int(periodicidade), "criticidade": int(criticidade),
+                        "custo_base": float(custo), "ambiente_exposicao": ambiente,
+                        "idade_ativo": int(idade), "fator_degradacao": float(fator),
+                        "data_referencia": str(data_ref), "observacao_tecnica": obs.strip(),
+                    }
                     st.session_state.working_tasks = pd.concat(
-                        [st.session_state.working_tasks, clean], ignore_index=True)
+                        [st.session_state.working_tasks, pd.DataFrame([nova], columns=ds.TASK_COLUMNS)],
+                        ignore_index=True)
                     st.session_state.editor_version += 1
+                    st.success(f"Tarefa adicionada: {sistema} · {subsistema} ({nome}).")
                     st.rerun()
-        except Exception as exc:
-            st.error(f"Não foi possível ler o arquivo: {exc}")
 
-    st.divider()
+    # ---- Importar planilha ----
+    with st.expander("📄 Importar planilha (CSV / Excel)"):
+        st.download_button("Baixar template CSV", data=ds.task_template_csv(),
+                           file_name="template_tarefas_pmav.csv", mime="text/csv")
+        uploaded = st.file_uploader("Enviar arquivo de Tarefas (uma linha por Tarefa)", type=["csv", "xlsx", "xls"])
+        if uploaded is not None:
+            try:
+                raw = ds.read_uploaded(uploaded)
+                clean, errors, warnings = ds.validate_tasks(raw)
+                for e in errors:
+                    st.error(e)
+                for w in warnings:
+                    st.warning(w)
+                if not clean.empty:
+                    st.success(f"{len(clean)} Tarefa(s) válida(s) prontas para importar.")
+                    st.dataframe(clean, use_container_width=True, hide_index=True, height=180)
+                    if st.button("➕ Adicionar Tarefas importadas à base", type="primary"):
+                        st.session_state.working_tasks = pd.concat(
+                            [st.session_state.working_tasks, clean], ignore_index=True)
+                        st.session_state.editor_version += 1
+                        st.rerun()
+            except Exception as exc:
+                st.error(f"Não foi possível ler o arquivo: {exc}")
 
-    # Exportar
-    ui.section_title("Exportar")
-    e1, e2 = st.columns(2)
-    e1.download_button(
-        "⬇️ Exportar Tarefas (CSV)",
-        data=st.session_state.working_tasks.to_csv(index=False).encode("utf-8-sig"),
-        file_name="tarefas_pmav.csv", mime="text/csv", use_container_width=True,
-    )
-    e2.download_button(
-        "⬇️ Exportar base completa (expandida 10 anos)",
-        data=ds.expand_tasks(_clean_now).to_csv(index=False).encode("utf-8-sig"),
-        file_name="base_pmav_completa.csv", mime="text/csv",
-        disabled=_clean_now.empty, use_container_width=True,
-    )
+    # ---- Exportar ----
+    with st.expander("⬇️ Exportar"):
+        x1, x2 = st.columns(2)
+        x1.download_button(
+            "Exportar Tarefas (CSV)",
+            data=st.session_state.working_tasks.to_csv(index=False).encode("utf-8-sig"),
+            file_name="tarefas_pmav.csv", mime="text/csv", use_container_width=True)
+        x2.download_button(
+            "Exportar base completa (10 anos)",
+            data=ds.expand_tasks(_clean_now).to_csv(index=False).encode("utf-8-sig"),
+            file_name="base_pmav_completa.csv", mime="text/csv",
+            disabled=_clean_now.empty, use_container_width=True)
 
 
 # ─────────────────────── Montagem da base + simulação ────────────────────────────
@@ -256,8 +302,6 @@ with st.sidebar:
     f_subs = st.multiselect("Subsistema", sorted(_sub_pool["subsistema"].unique()) if has_data else [])
     f_crit = st.multiselect("Criticidade", CRITICALITY_LEVELS, format_func=criticality_label)
     f_horizonte = st.slider("Horizonte (ano do PMAV)", 1, 10, (1, 10))
-    st.divider()
-    st.caption("Base na sessão · pronto para integração futura ao VistoPred.")
 
 
 def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
@@ -289,92 +333,90 @@ else:
     kpis = agg.compute_kpis(df_f)
 
 
-# ============================== ABA 1 — DASHBOARD ================================
-with tab_dash:
-    if not has_data:
-        st.info("Sem dados na base. Use o seletor **Fonte de dados** (barra lateral): carregue a "
-                "**Edificação Modelo**, comece um **Novo Ativo** ou **baixe do App VistoPred** — "
-                "e edite as Tarefas na aba *Dados & Tarefas*.")
-    elif df_f.empty:
-        st.warning("Nenhum registro corresponde aos filtros selecionados. Ajuste os filtros na barra lateral.")
-    else:
-        ui.render_asset_bar(df_f)
-        st.write("")
-        ui.render_kpis(kpis)
-        st.write("")
-        ui.render_model_panel(model)
-        st.write("")
+# ─────────────────────────────────────── Dashboard ───────────────────────────────
+if not has_data:
+    st.info("Sem dados na base. No painel **Dados & Tarefas** (acima): cadastre um **Novo Ativo**, "
+            "**baixe do App VistoPred** pelo código, ou volte para a **Edificação Modelo** na barra lateral.")
+elif df_f.empty:
+    st.warning("Nenhum registro corresponde aos filtros selecionados. Ajuste os filtros na barra lateral.")
+else:
+    ui.render_asset_bar(df_f)
+    st.write("")
+    ui.render_kpis(kpis)
+    st.write("")
+    ui.render_model_panel(model)
+    st.write("")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            ui.section_title("Custo total previsto por cenário")
-            st.plotly_chart(charts.chart_cost_by_scenario(agg.cost_by_scenario(df_all_f), scenario_id),
-                            use_container_width=True)
-        with col2:
-            ui.section_title("Custo previsto por sistema")
-            st.plotly_chart(charts.chart_cost_by_system(agg.cost_by_system(df_f)), use_container_width=True)
+    col1, col2 = st.columns(2)
+    with col1:
+        ui.section_title("Custo total previsto por cenário")
+        st.plotly_chart(charts.chart_cost_by_scenario(agg.cost_by_scenario(df_all_f), scenario_id),
+                        use_container_width=True)
+    with col2:
+        ui.section_title("Custo previsto por sistema")
+        st.plotly_chart(charts.chart_cost_by_system(agg.cost_by_system(df_f)), use_container_width=True)
 
-        col3, col4 = st.columns(2)
-        with col3:
-            ui.section_title("Custo ajustado vs. custo previsto")
-            st.plotly_chart(charts.chart_adjusted_vs_predicted(agg.adjusted_vs_predicted(df_f)), use_container_width=True)
-        with col4:
-            ui.section_title("Distribuição de alertas por sistema")
-            st.plotly_chart(charts.chart_alerts_by_system(agg.alerts_by_system(df_f)), use_container_width=True)
+    col3, col4 = st.columns(2)
+    with col3:
+        ui.section_title("Custo ajustado vs. custo previsto")
+        st.plotly_chart(charts.chart_adjusted_vs_predicted(agg.adjusted_vs_predicted(df_f)), use_container_width=True)
+    with col4:
+        ui.section_title("Distribuição de alertas por sistema")
+        st.plotly_chart(charts.chart_alerts_by_system(agg.alerts_by_system(df_f)), use_container_width=True)
 
-        ui.section_title("Custo previsto e criticidade média projetada por sistema")
-        st.plotly_chart(charts.chart_cost_and_criticality(agg.cost_and_criticality_by_system(df_f)), use_container_width=True)
-        st.write("")
+    ui.section_title("Custo previsto e criticidade média projetada por sistema")
+    st.plotly_chart(charts.chart_cost_and_criticality(agg.cost_and_criticality_by_system(df_f)), use_container_width=True)
+    st.write("")
 
-        left, right = st.columns([1.15, 1])
-        with left:
-            ui.section_title("Ranking de sistemas prioritários")
-            st.dataframe(
-                agg.system_ranking(df_f), use_container_width=True, hide_index=True,
-                column_config={
-                    "sistema": "Sistema",
-                    "custo_previsto": st.column_config.NumberColumn("Custo previsto (R$)", format="%.0f"),
-                    "criticidade_media": st.column_config.NumberColumn("Crit. média", format="%.2f"),
-                    "alertas": st.column_config.NumberColumn("Alertas"),
-                    "score": st.column_config.ProgressColumn("Score de prioridade", min_value=0.0, max_value=1.0, format="%.2f"),
-                },
-            )
-        with right:
-            ui.section_title("Painel de alertas")
-            ui.render_alert_panel(df_f)
-
-        st.write("")
-        ui.section_title("Tabela analítica detalhada")
-        table_cols = [
-            "nome_ativo", "tipo_ativo", "sistema", "subsistema", "tipo_os", "criticidade", "criticidade_projetada",
-            "periodicidade_meses", "frequencia_prevista", "horizonte_ano",
-            "custo_base", "custo_ajustado", "custo_previsto", "prioridade", "status_alerta",
-        ]
+    left, right = st.columns([1.15, 1])
+    with left:
+        ui.section_title("Ranking de sistemas prioritários")
         st.dataframe(
-            df_f[table_cols], use_container_width=True, hide_index=True, height=360,
+            agg.system_ranking(df_f), use_container_width=True, hide_index=True,
             column_config={
-                "nome_ativo": "Ativo", "tipo_ativo": "Tipo", "sistema": "Sistema", "subsistema": "Subsistema",
-                "tipo_os": "Tipo O.S.",
-                "criticidade": st.column_config.NumberColumn("Criticidade", help="0 = risco iminente · 5 = muito baixa"),
-                "criticidade_projetada": st.column_config.NumberColumn("Crit. projetada", format="%.2f"),
-                "periodicidade_meses": st.column_config.NumberColumn("Period. (meses)"),
-                "frequencia_prevista": st.column_config.NumberColumn("Freq./ano", format="%.2f"),
-                "horizonte_ano": st.column_config.NumberColumn("Ano"),
-                "custo_base": st.column_config.NumberColumn("Custo base (R$)", format="%.0f"),
-                "custo_ajustado": st.column_config.NumberColumn("Custo ajustado (R$)", format="%.0f"),
+                "sistema": "Sistema",
                 "custo_previsto": st.column_config.NumberColumn("Custo previsto (R$)", format="%.0f"),
-                "prioridade": "Prioridade", "status_alerta": "Alerta",
+                "criticidade_media": st.column_config.NumberColumn("Crit. média", format="%.2f"),
+                "alertas": st.column_config.NumberColumn("Alertas"),
+                "score": st.column_config.ProgressColumn("Score de prioridade", min_value=0.0, max_value=1.0, format="%.2f"),
             },
         )
-        st.download_button(
-            "⬇️ Exportar tabela filtrada (CSV)",
-            data=df_f.to_csv(index=False).encode("utf-8-sig"),
-            file_name=f"pmav_{scenario_id}.csv", mime="text/csv",
-        )
+    with right:
+        ui.section_title("Painel de alertas")
+        ui.render_alert_panel(df_f)
 
-        st.write("")
-        ui.section_title("Resumo executivo")
-        ui.render_executive_summary(agg.executive_summary(df_f, scenario, kpis))
+    st.write("")
+    ui.section_title("Tabela analítica detalhada")
+    table_cols = [
+        "nome_ativo", "tipo_ativo", "sistema", "subsistema", "tipo_os", "criticidade", "criticidade_projetada",
+        "periodicidade_meses", "frequencia_prevista", "horizonte_ano",
+        "custo_base", "custo_ajustado", "custo_previsto", "prioridade", "status_alerta",
+    ]
+    st.dataframe(
+        df_f[table_cols], use_container_width=True, hide_index=True, height=360,
+        column_config={
+            "nome_ativo": "Ativo", "tipo_ativo": "Tipo", "sistema": "Sistema", "subsistema": "Subsistema",
+            "tipo_os": "Tipo O.S.",
+            "criticidade": st.column_config.NumberColumn("Criticidade", help="0 = risco iminente · 5 = muito baixa"),
+            "criticidade_projetada": st.column_config.NumberColumn("Crit. projetada", format="%.2f"),
+            "periodicidade_meses": st.column_config.NumberColumn("Period. (meses)"),
+            "frequencia_prevista": st.column_config.NumberColumn("Freq./ano", format="%.2f"),
+            "horizonte_ano": st.column_config.NumberColumn("Ano"),
+            "custo_base": st.column_config.NumberColumn("Custo base (R$)", format="%.0f"),
+            "custo_ajustado": st.column_config.NumberColumn("Custo ajustado (R$)", format="%.0f"),
+            "custo_previsto": st.column_config.NumberColumn("Custo previsto (R$)", format="%.0f"),
+            "prioridade": "Prioridade", "status_alerta": "Alerta",
+        },
+    )
+    st.download_button(
+        "⬇️ Exportar tabela filtrada (CSV)",
+        data=df_f.to_csv(index=False).encode("utf-8-sig"),
+        file_name=f"pmav_{scenario_id}.csv", mime="text/csv",
+    )
+
+    st.write("")
+    ui.section_title("Resumo executivo")
+    ui.render_executive_summary(agg.executive_summary(df_f, scenario, kpis))
 
 
 st.write("")
