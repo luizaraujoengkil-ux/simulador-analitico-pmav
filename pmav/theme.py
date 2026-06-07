@@ -77,6 +77,10 @@ def inject_css() -> None:
         .vp-header .scn {{ margin-left: auto; text-align: right; }}
         .vp-header .scn .lbl {{ font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: rgba(214,233,249,0.7); }}
         .vp-header .scn .val {{ font-size: 16px; font-weight: 700; }}
+        .vp-header .scn .cred {{ margin-top: 14px; font-size: 11px; line-height: 1.5; color: rgba(214,233,249,0.7); }}
+        .vp-header .scn .cred b {{ color: #e8f1fb; font-weight: 700; }}
+        .vp-header .scn .cred a {{ color: #22d3ee; text-decoration: none; }}
+        .vp-header .scn .cred a:hover {{ text-decoration: underline; }}
 
         /* Cards / KPIs */
         .vp-card {{

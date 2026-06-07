@@ -521,6 +521,12 @@ else:
 
 
 st.write("")
+ui.section_title("Autoria")
+st.markdown(
+    "Desenvolvido por **Luiz Araujo** — "
+    "[luiz.junior@ime.eb.br](mailto:luiz.junior@ime.eb.br) · "
+    "IME — Instituto Militar de Engenharia"
+)
 st.caption(
     "Simulador Analítico PMAV – VistoPred · base montada na sessão · "
     "modelo de regressão linear múltipla (OLS) para fins analíticos."

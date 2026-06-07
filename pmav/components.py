@@ -32,6 +32,9 @@ def render_header(scenario: Scenario) -> None:
             <div class="scn">
                 <div class="lbl">Cenário ativo</div>
                 <div class="val">{html.escape(scenario.nome)}</div>
+                <div class="cred">Desenvolvido por <b>Luiz Araujo</b> ·
+                    <a href="mailto:luiz.junior@ime.eb.br">luiz.junior@ime.eb.br</a><br>
+                    IME — Instituto Militar de Engenharia</div>
             </div>
         </div>
         """,
