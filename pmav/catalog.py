@@ -58,6 +58,9 @@ ASSET_TYPES: list[str] = [e.value for e in AssetType]
 SYSTEM_NAMES: list[str] = [e.value for e in SystemName]
 EXPOSURE_ENVIRONMENTS: list[str] = [e.value for e in ExposureEnvironment]
 
+# Tipos de Ordem de Serviço (O.S.) / natureza da Tarefa.
+OS_TYPES: list[str] = ["Preventiva", "Corretiva", "Preditiva", "Inspeção"]
+
 
 # ─────────────────────────────── Escala de criticidade ───────────────────────────
 

@@ -158,3 +158,51 @@ def render_executive_summary(text: str) -> None:
 
 def section_title(text: str) -> None:
     st.markdown(f'<div class="vp-section">{html.escape(text)}</div>', unsafe_allow_html=True)
+
+
+def render_asset_bar(df: pd.DataFrame) -> None:
+    """Barra de contexto do(s) ativo(s) no recorte atual (nome + dados em destaque)."""
+    if df.empty:
+        return
+
+    ativos = df.drop_duplicates("id_ativo")
+    n = int(ativos["id_ativo"].nunique())
+
+    if n == 1:
+        r = ativos.iloc[0]
+        nsys = int(df["sistema"].nunique())
+        pills = "".join(
+            f'<span class="vp-pill">{html.escape(str(v))}</span>'
+            for v in (
+                r["tipo_ativo"],
+                f'{int(r["idade_ativo"])} anos',
+                r["ambiente_exposicao"],
+                f"{nsys} sistema(s)",
+                r["id_ativo"],
+            )
+        )
+        st.markdown(
+            f"""
+            <div class="vp-card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                <div>
+                    <div class="lbl" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:{COLORS['slate_500']};font-weight:600">Ativo em análise</div>
+                    <div style="font-size:20px;font-weight:800;color:{COLORS['brand_900']}">{html.escape(str(r["nome_ativo"]))}</div>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto">{pills}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        nomes = sorted(ativos["nome_ativo"].astype(str).unique())
+        mostra = ", ".join(nomes[:6]) + ("…" if len(nomes) > 6 else "")
+        st.markdown(
+            f"""
+            <div class="vp-card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+                <div class="lbl" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:{COLORS['slate_500']};font-weight:600">Ativos no recorte</div>
+                <span style="font-size:20px;font-weight:800;color:{COLORS['brand_900']}">{n}</span>
+                <span style="color:{COLORS['slate_700']};font-size:13px">{html.escape(mostra)}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )

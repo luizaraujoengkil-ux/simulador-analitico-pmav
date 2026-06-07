@@ -27,7 +27,7 @@ SUBSYSTEMS_PER_SYSTEM = 2  # mantém o volume de dados equilibrado
 DEFAULT_SEED = 20260101
 
 COLUMNS = [
-    "id", "id_ativo", "tipo_ativo", "nome_ativo", "sistema", "subsistema",
+    "id", "id_ativo", "tipo_ativo", "nome_ativo", "sistema", "subsistema", "tipo_os",
     "periodicidade_meses", "frequencia_prevista", "horizonte_ano", "criticidade",
     "custo_base", "data_referencia", "observacao_tecnica", "ambiente_exposicao",
     "idade_ativo", "fator_degradacao", "prioridade", "impacto_operacional",
@@ -90,6 +90,15 @@ def _impact(c: int) -> str:
     return "Baixo"
 
 
+def _os_type(c: int) -> str:
+    """Natureza da O.S. inferida da criticidade base."""
+    if c == 0:
+        return "Corretiva"
+    if c <= 3:
+        return "Preventiva"
+    return "Inspeção"
+
+
 def _degradation(rs: np.random.RandomState, idade: int, ambiente: str) -> float:
     base = min(0.6, idade / 60)
     env = ENV_DEGRADATION.get(ambiente, 0.1)
@@ -137,6 +146,7 @@ def generate_mock_dataset(seed: int = DEFAULT_SEED) -> pd.DataFrame:
                         "nome_ativo": asset.nome,
                         "sistema": sistema,
                         "subsistema": subsistema,
+                        "tipo_os": _os_type(criticidade),
                         "periodicidade_meses": periodicidade,
                         "frequencia_prevista": frequencia,
                         "horizonte_ano": ano,
