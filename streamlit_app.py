@@ -78,11 +78,18 @@ def run_simulation_cached(source: str, base: pd.DataFrame):
     return simulate_concat(base, SCENARIOS, source)
 
 
-def editor_column_config() -> dict:
+def asset_type_options() -> list[str]:
+    """Tipos padrão + tipos personalizados já presentes na base (para o editor/filtros)."""
+    extra = [str(t) for t in st.session_state.working_tasks["tipo_ativo"].dropna().unique()
+             if str(t) and str(t) not in ASSET_TYPES]
+    return ASSET_TYPES + sorted(set(extra))
+
+
+def editor_column_config(asset_types: list[str]) -> dict:
     """Colunas da tabela editável (dropdowns + numéricos validados)."""
     return {
         "id_ativo": st.column_config.TextColumn("ID ativo"),
-        "tipo_ativo": st.column_config.SelectboxColumn("Tipo", options=ASSET_TYPES, required=True),
+        "tipo_ativo": st.column_config.SelectboxColumn("Tipo", options=asset_types, required=True),
         "nome_ativo": st.column_config.TextColumn("Nome do ativo", required=True),
         "sistema": st.column_config.SelectboxColumn("Sistema", options=SYSTEM_NAMES, required=True),
         "subsistema": st.column_config.TextColumn("Subsistema", required=True),
@@ -158,14 +165,38 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
         c[1].caption("Base fictícia com 6 ativos. Edite as Tarefas na tabela abaixo.")
 
     elif mode == MODE_NEW:
-        st.markdown("##### 🆕 Novo Ativo — cadastre abaixo")
+        st.markdown("##### 🆕 Cadastrar novo ativo (atalho)")
+        with st.form("cadastro_ativo", clear_on_submit=True):
+            a1, a2, a3 = st.columns([1.3, 1, 1])
+            na_nome = a1.text_input("Nome do ativo *")
+            na_tipo = a2.selectbox("Tipo de ativo *", ASSET_TYPES,
+                                   help="Escolha 'Outro' e digite ao lado para um tipo personalizado.")
+            na_tipo_custom = a3.text_input("Se 'Outro', especifique", placeholder="ex.: Reservatório")
+            a4, a5, a6 = st.columns(3)
+            na_id = a4.text_input("ID do ativo (opcional)")
+            na_idade = a5.number_input("Idade (anos)", min_value=0, max_value=120, value=10, step=1)
+            na_amb = a6.selectbox("Ambiente", EXPOSURE_ENVIRONMENTS, index=1)
+            ok = st.form_submit_button("➕ Cadastrar ativo (cria 1 Tarefa-modelo)", type="primary")
+            if ok:
+                tipo_final = (na_tipo_custom.strip()
+                              if (na_tipo == "Outro" and na_tipo_custom.strip()) else na_tipo)
+                if not na_nome.strip():
+                    st.error("Informe o **Nome do ativo**.")
+                else:
+                    skel = ds.skeleton_task(na_nome, tipo_final, na_id, na_idade, na_amb)
+                    st.session_state.working_tasks = pd.concat(
+                        [st.session_state.working_tasks, skel], ignore_index=True)
+                    st.session_state.editor_version += 1
+                    st.success(f"Ativo '{na_nome.strip()}' ({tipo_final}) cadastrado com 1 Tarefa-modelo. "
+                               "Ajuste sistema, subsistema e custo na tabela abaixo.")
+                    st.rerun()
         cc = st.columns([1, 2])
         if cc[0].button("🧹 Começar base vazia", use_container_width=True):
             st.session_state.working_tasks = ds.empty_tasks()
             st.session_state.editor_version += 1
             st.rerun()
-        cc[1].caption("Preencha o **formulário guiado** abaixo (ou edite direto na tabela) "
-                      "para cadastrar o ativo e suas Tarefas/O.S.")
+        cc[1].caption("Cadastrou o ativo? Ele já aparece nos filtros **Ativo (nome)** e **Tipo de ativo**. "
+                      "Use o **formulário guiado** abaixo para adicionar mais Tarefas/O.S. a ele.")
 
     else:  # MODE_VP
         st.markdown("##### 🔌 Baixar do App VistoPred")
@@ -201,7 +232,7 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
         st.session_state.working_tasks,
         num_rows="dynamic", use_container_width=True, height=320,
         key=f"editor_{st.session_state.editor_version}",
-        column_config=editor_column_config(),
+        column_config=editor_column_config(asset_type_options()),
     )
     st.session_state.working_tasks = edited
     _clean_now, _, _ = ds.validate_tasks(st.session_state.working_tasks)
@@ -211,10 +242,12 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
     # ---- Formulário guiado (principal no modo Novo Ativo) ----
     with st.expander("➕ Adicionar Tarefa (formulário guiado)", expanded=(mode == MODE_NEW)):
         with st.form("nova_tarefa", clear_on_submit=True):
-            f1, f2, f3 = st.columns(3)
+            f1, f2 = st.columns([2, 1])
             nome = f1.text_input("Nome do ativo *")
-            tipo = f2.selectbox("Tipo de ativo *", ASSET_TYPES)
-            id_ativo = f3.text_input("ID do ativo", help="Opcional — gerado do nome se vazio.")
+            id_ativo = f2.text_input("ID do ativo", help="Opcional — gerado do nome se vazio.")
+            ft1, ft2 = st.columns(2)
+            tipo = ft1.selectbox("Tipo de ativo *", ASSET_TYPES)
+            tipo_custom = ft2.text_input("Se 'Outro', especifique", placeholder="tipo personalizado")
 
             f4, f5, f6 = st.columns(3)
             sistema = f4.selectbox("Sistema *", SYSTEM_NAMES)
@@ -239,9 +272,11 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
                 if not nome.strip() or not subsistema.strip():
                     st.error("Preencha pelo menos **Nome do ativo** e **Subsistema**.")
                 else:
+                    tipo_final = (tipo_custom.strip()
+                                  if (tipo == "Outro" and tipo_custom.strip()) else tipo)
                     nova = {
                         "id_ativo": id_ativo.strip() or ds.slugify_id(nome),
-                        "tipo_ativo": tipo, "nome_ativo": nome.strip(),
+                        "tipo_ativo": tipo_final, "nome_ativo": nome.strip(),
                         "sistema": sistema, "subsistema": subsistema.strip(), "tipo_os": tipo_os,
                         "periodicidade_meses": int(periodicidade), "criticidade": int(criticidade),
                         "custo_base": float(custo), "ambiente_exposicao": ambiente,

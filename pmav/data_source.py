@@ -271,3 +271,21 @@ def records_to_tasks(df_records: pd.DataFrame) -> pd.DataFrame:
 def example_tasks() -> pd.DataFrame:
     """Base de exemplo já no nível de Tarefa (editável no app)."""
     return records_to_tasks(generate_mock_dataset())
+
+
+def skeleton_task(nome: str, tipo: str, id_ativo: str = "", idade: int = 10,
+                  ambiente: str = "Externo") -> pd.DataFrame:
+    """
+    Cria uma 'Tarefa-modelo' (esqueleto) para um novo ativo recém-cadastrado.
+    O usuário ajusta os demais campos (sistema, custo, etc.) na tabela editável.
+    Aceita tipo personalizado (texto livre) — não precisa estar nos 7 padrões.
+    """
+    idv = str(id_ativo).strip() or slugify_id(nome)
+    row = {
+        "id_ativo": idv, "tipo_ativo": str(tipo).strip() or "Outro", "nome_ativo": str(nome).strip(),
+        "sistema": "Estrutural", "subsistema": "A definir", "tipo_os": "Preventiva",
+        "periodicidade_meses": 12, "criticidade": 3, "custo_base": 10000.0,
+        "ambiente_exposicao": ambiente, "idade_ativo": int(idade), "fator_degradacao": 0.30,
+        "data_referencia": REFERENCE_DATE, "observacao_tecnica": "Tarefa-modelo — edite os dados.",
+    }
+    return pd.DataFrame([row], columns=TASK_COLUMNS)
