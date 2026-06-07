@@ -13,6 +13,8 @@ base, para que edições reflitam no dashboard no mesmo ciclo.
 """
 from __future__ import annotations
 
+from datetime import datetime
+
 import pandas as pd
 import streamlit as st
 
@@ -21,6 +23,7 @@ from pmav import aggregations as agg
 from pmav import charts
 from pmav import components as ui
 from pmav import data_source as ds
+from pmav import report
 from pmav import vistopred_client as vp
 from pmav.catalog import (
     ASSET_TYPES,
@@ -441,6 +444,23 @@ def apply_filters(df: pd.DataFrame) -> pd.DataFrame:
     return df[mask]
 
 
+def filters_text() -> str:
+    """Descrição textual dos filtros aplicados (para o cabeçalho do relatório)."""
+    parts = []
+    if f_ativos:
+        parts.append("Ativo: " + ", ".join(map(str, f_ativos)))
+    if f_tipos:
+        parts.append("Tipo: " + ", ".join(map(str, f_tipos)))
+    if f_sistemas:
+        parts.append("Sistema: " + ", ".join(map(str, f_sistemas)))
+    if f_subs:
+        parts.append("Subsistema: " + ", ".join(map(str, f_subs)))
+    if f_crit:
+        parts.append("Criticidade: " + ", ".join(map(str, f_crit)))
+    parts.append(f"Horizonte: anos {f_horizonte[0]}–{f_horizonte[1]}")
+    return " · ".join(parts) if parts else "nenhum (base completa)"
+
+
 if has_data:
     df_f = apply_filters(df_scn)
     df_all_f = apply_filters(full)
@@ -451,6 +471,22 @@ else:
     df_all_f = full
     model = None
     kpis = agg.compute_kpis(df_f)
+
+
+# ───────────────────────── Sidebar (relatório completo) ──────────────────────────
+with st.sidebar:
+    st.divider()
+    st.markdown("**Relatório**")
+    if st.button("📑 Simulação Total (PDF completo)", width="stretch",
+                 disabled=not has_data, key="gen_full"):
+        with st.spinner("Gerando relatório completo..."):
+            st.session_state.report_full = report.build_full_report(
+                df_all_f, models, SCENARIOS, filters_text(),
+                datetime.now().strftime("%d/%m/%Y %H:%M"))
+    if st.session_state.get("report_full"):
+        st.download_button("⬇️ Baixar Simulação Total (PDF)", data=st.session_state.report_full,
+                           file_name="relatorio_pmav_completo.pdf", mime="application/pdf",
+                           width="stretch", key="dl_full")
 
 
 # ─────────────────────────────────────── Dashboard ───────────────────────────────
@@ -563,6 +599,19 @@ else:
     st.write("")
     ui.section_title("Resumo executivo")
     ui.render_executive_summary(agg.executive_summary(df_f, scenario, kpis))
+
+    st.write("")
+    ui.section_title("Relatório desta simulação")
+    rcol1, rcol2 = st.columns(2)
+    if rcol1.button("📄 Gerar relatório (PDF)", width="stretch", key="gen_sim"):
+        with st.spinner("Gerando relatório..."):
+            st.session_state.report_sim = report.build_simulation_report(
+                df_f, scenario, kpis, model, filters_text(),
+                datetime.now().strftime("%d/%m/%Y %H:%M"))
+    if st.session_state.get("report_sim"):
+        rcol2.download_button("⬇️ Baixar relatório (PDF)", data=st.session_state.report_sim,
+                              file_name=f"relatorio_pmav_{scenario_id}.pdf", mime="application/pdf",
+                              width="stretch", key="dl_sim")
 
 
 st.write("")
