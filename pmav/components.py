@@ -128,8 +128,8 @@ def alert_badge(tipo: str) -> str:
     return f'<span class="vp-badge" style="background:{color}">{html.escape(tipo)}</span>'
 
 
-def render_alert_panel(df: pd.DataFrame, limit: int = 12) -> None:
-    """Painel de alertas com destaque visual (imediatos primeiro)."""
+def render_alert_panel(df: pd.DataFrame, initial: int = 3, expanded_max: int = 25) -> None:
+    """Painel de alertas (imediatos primeiro). Mostra `initial` cards + botão 'Veja +'."""
     alerts = df[df["status_alerta"] != "Normal"].copy()
     if alerts.empty:
         st.success("Nenhum alerta no recorte atual. Sistemas dentro dos parâmetros do PMAV.")
@@ -138,9 +138,13 @@ def render_alert_panel(df: pd.DataFrame, limit: int = 12) -> None:
     # Ordena: Imediato antes de Preditivo; depois por criticidade projetada (pior primeiro).
     order = {"Imediato": 0, "Preditivo": 1}
     alerts["_o"] = alerts["status_alerta"].map(order)
-    alerts = alerts.sort_values(["_o", "criticidade_projetada"]).head(limit)
+    alerts = alerts.sort_values(["_o", "criticidade_projetada"]).reset_index(drop=True)
+    total = len(alerts)
 
-    for row in alerts.itertuples(index=False):
+    show_all = bool(st.session_state.get("alerts_show_all", False))
+    n_show = min(expanded_max, total) if show_all else min(initial, total)
+
+    for row in alerts.head(n_show).itertuples(index=False):
         cls = "imediato" if row.status_alerta == "Imediato" else "preditivo"
         st.markdown(
             f"""
@@ -156,6 +160,18 @@ def render_alert_panel(df: pd.DataFrame, limit: int = 12) -> None:
             """,
             unsafe_allow_html=True,
         )
+
+    # Controle "Veja + / Ver menos" para manter o painel limpo.
+    if total > initial:
+        if not show_all:
+            st.button(f"▼ Veja + ({total - initial} restantes)", key="alerts_more", width="stretch",
+                      on_click=lambda: st.session_state.update(alerts_show_all=True))
+        else:
+            if total > expanded_max:
+                st.caption(f"Mostrando os {expanded_max} alertas mais críticos de {total}. "
+                           "Refine os filtros para focar.")
+            st.button("▲ Ver menos", key="alerts_less", width="stretch",
+                      on_click=lambda: st.session_state.update(alerts_show_all=False))
 
 
 def render_executive_summary(text: str) -> None:
