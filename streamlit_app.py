@@ -49,6 +49,9 @@ MODE_MODEL = "Dados Modelo"
 MODE_NEW = "Novo Ativo"
 MODE_VP = "Baixar do App VistoPred"
 
+# Opção para criar um sistema personalizado nos formulários.
+NEW_SYSTEM_OPT = "➕ Outro (novo sistema)"
+
 # Chaves dos filtros (usadas para resetar no botão "Limpar filtros").
 FILTER_KEYS = ["f_ativos", "f_tipos", "f_sistemas", "f_subs", "f_crit", "f_horizonte"]
 
@@ -85,13 +88,20 @@ def asset_type_options() -> list[str]:
     return ASSET_TYPES + sorted(set(extra))
 
 
-def editor_column_config(asset_types: list[str]) -> dict:
+def system_options() -> list[str]:
+    """Sistemas padrão + sistemas personalizados já presentes na base."""
+    extra = [str(s) for s in st.session_state.working_tasks["sistema"].dropna().unique()
+             if str(s) and str(s) not in SYSTEM_NAMES]
+    return SYSTEM_NAMES + sorted(set(extra))
+
+
+def editor_column_config(asset_types: list[str], system_types: list[str]) -> dict:
     """Colunas da tabela editável (dropdowns + numéricos validados)."""
     return {
         "id_ativo": st.column_config.TextColumn("ID ativo"),
         "tipo_ativo": st.column_config.SelectboxColumn("Tipo", options=asset_types, required=True),
         "nome_ativo": st.column_config.TextColumn("Nome do ativo", required=True),
-        "sistema": st.column_config.SelectboxColumn("Sistema", options=SYSTEM_NAMES, required=True),
+        "sistema": st.column_config.SelectboxColumn("Sistema", options=system_types, required=True),
         "subsistema": st.column_config.TextColumn("Subsistema", required=True),
         "tipo_os": st.column_config.SelectboxColumn("Tipo de O.S.", options=OS_TYPES),
         "periodicidade_meses": st.column_config.NumberColumn("Period. (meses)", min_value=1, max_value=120, step=1),
@@ -232,7 +242,7 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
         st.session_state.working_tasks,
         num_rows="dynamic", use_container_width=True, height=320,
         key=f"editor_{st.session_state.editor_version}",
-        column_config=editor_column_config(asset_type_options()),
+        column_config=editor_column_config(asset_type_options(), system_options()),
     )
     st.session_state.working_tasks = edited
     _clean_now, _, _ = ds.validate_tasks(st.session_state.working_tasks)
@@ -249,9 +259,12 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
             tipo = ft1.selectbox("Tipo de ativo *", ASSET_TYPES)
             tipo_custom = ft2.text_input("Se 'Outro', especifique", placeholder="tipo personalizado")
 
-            f4, f5, f6 = st.columns(3)
-            sistema = f4.selectbox("Sistema *", SYSTEM_NAMES)
-            subsistema = f5.text_input("Subsistema *")
+            f4, f5 = st.columns(2)
+            sistema_sel = f4.selectbox("Sistema *", SYSTEM_NAMES + [NEW_SYSTEM_OPT],
+                                       help="Escolha 'Outro (novo sistema)' para criar um sistema novo.")
+            sistema_custom = f5.text_input("Se 'Outro', novo sistema", placeholder="ex.: Acessibilidade")
+            f5b, f6 = st.columns(2)
+            subsistema = f5b.text_input("Subsistema *")
             tipo_os = f6.selectbox("Tipo de O.S.", OS_TYPES)
 
             f7, f8, f9 = st.columns(3)
@@ -269,15 +282,19 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
             submitted = st.form_submit_button("➕ Adicionar Tarefa à base", type="primary")
 
             if submitted:
+                sistema_final = (sistema_custom.strip()
+                                 if (sistema_sel == NEW_SYSTEM_OPT and sistema_custom.strip()) else sistema_sel)
+                tipo_final = (tipo_custom.strip()
+                              if (tipo == "Outro" and tipo_custom.strip()) else tipo)
                 if not nome.strip() or not subsistema.strip():
                     st.error("Preencha pelo menos **Nome do ativo** e **Subsistema**.")
+                elif sistema_sel == NEW_SYSTEM_OPT and not sistema_custom.strip():
+                    st.error("Você escolheu **Outro (novo sistema)** — digite o nome do novo sistema.")
                 else:
-                    tipo_final = (tipo_custom.strip()
-                                  if (tipo == "Outro" and tipo_custom.strip()) else tipo)
                     nova = {
                         "id_ativo": id_ativo.strip() or ds.slugify_id(nome),
                         "tipo_ativo": tipo_final, "nome_ativo": nome.strip(),
-                        "sistema": sistema, "subsistema": subsistema.strip(), "tipo_os": tipo_os,
+                        "sistema": sistema_final, "subsistema": subsistema.strip(), "tipo_os": tipo_os,
                         "periodicidade_meses": int(periodicidade), "criticidade": int(criticidade),
                         "custo_base": float(custo), "ambiente_exposicao": ambiente,
                         "idade_ativo": int(idade), "fator_degradacao": float(fator),
@@ -287,7 +304,7 @@ with st.expander("📥  Dados & Tarefas — gerenciar a base (importar · editar
                         [st.session_state.working_tasks, pd.DataFrame([nova], columns=ds.TASK_COLUMNS)],
                         ignore_index=True)
                     st.session_state.editor_version += 1
-                    st.success(f"Tarefa adicionada: {sistema} · {subsistema} ({nome}).")
+                    st.success(f"Tarefa adicionada: {sistema_final} · {subsistema} ({nome}).")
                     st.rerun()
 
     # ---- Importar planilha ----
